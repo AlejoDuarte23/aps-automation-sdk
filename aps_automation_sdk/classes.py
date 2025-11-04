@@ -123,6 +123,7 @@ class Activity(BaseModel):
     description: str
     alias: str
     commandLine: Optional[list[str]] = None
+    script: str | None = None
 
     def param_map(self) -> dict[str, dict[str, Any]]:
         return {p.name: p.to_api_param() for p in self.parameters}
@@ -143,8 +144,26 @@ class Activity(BaseModel):
             f'/al "$(appbundles[{appbundle_short_id}].path)"'
         ]
 
+
+    def set_autocad_command_line(self) -> None:
+        autocad_input = next((p for p in self.parameters if isinstance(p, ActivityInputParameter) and p.is_engine_input), None)
+        if autocad_input is None:
+            raise ValueError("No AutoCAD input parameter marked as engine input")
+        appbundle_short_id = self.short_appbundle_id(self.appbundle_full_name)
+        
+        cmd = (
+            "$(engine.path)\\accoreconsole.exe "
+            f'/i "$(args[{autocad_input.name}].path)" '
+            f'/al "$(appbundles[{appbundle_short_id}].path)"'
+        )
+        
+        if self.script:
+            cmd += ' /s "$(settings[script].path)"'
+        
+        self.commandLine = [cmd]
+
     def to_api_dict(self) -> dict[str, Any]:
-        return {
+        activity_dict =  {
             "id": self.id,
             "commandLine": self.commandLine,
             "parameters": self.param_map(),
@@ -152,6 +171,9 @@ class Activity(BaseModel):
             "appbundles": [self.appbundle_full_name],
             "description": self.description,
         }
+        if self.script:
+            activity_dict["settings"] = {"script": self.script}
+        return activity_dict
 
     def deploy(self, token: str) -> None:
         create_activity(token=token, payload=self.to_api_dict())
