@@ -144,6 +144,24 @@ class Activity(BaseModel):
             f'/al "$(appbundles[{appbundle_short_id}].path)"'
         ]
 
+
+    def set_autocad_command_line(self) -> None:
+        autocad_input = next((p for p in self.parameters if isinstance(p, ActivityInputParameter) and p.is_engine_input), None)
+        if autocad_input is None:
+            raise ValueError("No AutoCAD input parameter marked as engine input")
+        appbundle_short_id = self.short_appbundle_id(self.appbundle_full_name)
+        
+        cmd = (
+            "$(engine.path)\\accoreconsole.exe "
+            f'/i "$(args[{autocad_input.name}].path)" '
+            f'/al "$(appbundles[{appbundle_short_id}].path)"'
+        )
+        
+        if self.script:
+            cmd += ' /s "$(settings[script].path)"'
+        
+        self.commandLine = [cmd]
+
     def to_api_dict(self) -> dict[str, Any]:
         activity_dict =  {
             "id": self.id,
